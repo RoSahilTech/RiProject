@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jal-Drishti - AI-Powered Water-Logging Risk Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .risk-high {
+            background: linear-gradient(135deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .risk-medium {
+            background: linear-gradient(135deg, #f6e05e, #ecc94b);
+            color: #744210;
+        }
+
+        .risk-low {
+            background: linear-gradient(135deg, #68d391, #48bb78);
+            color: white;
+        }
+
+        .animate-pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .notification-badge {
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .sidebar-item:hover {
+            transform: translateX(5px);
+            transition: all 0.3s ease;
+        }
+
+        .action-card {
+            transition: all 0.3s ease;
+        }
+
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen bg-gray-50">
+        <!-- Header -->
+        <header class="glass-effect shadow-lg sticky top-0 z-50">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <i class="fas fa-water text-3xl text-blue-600"></i>
+                        <div>
+                            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                Jal-Drishti Dashboard
+                            </h1>
+                            <p class="text-sm text-gray-600">AI-Powered Water-Logging Risk Management System</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative notification-badge">
+                            <i class="fas fa-bell text-xl text-gray-600 cursor-pointer"></i>
+                            <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-2">3</span>
+                        </div>
+                        <button class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition">
+                            <i class="fas fa-plus mr-2"></i>Report Issue
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="container mx-auto px-4 py-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="glass-effect rounded-xl p-4 action-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Wards</p>
+                            <p class="text-2xl font-bold">272</p>
+                        </div>
+                        <i class="fas fa-map-marked-alt text-3xl text-blue-500"></i>
+                    </div>
+                </div>
+                <div class="glass-effect rounded-xl p-4 action-card risk-high">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white/80 text-sm">High Risk</p>
+                            <p class="text-2xl font-bold">18</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-3xl animate-pulse-slow"></i>
+                    </div>
+                </div>
+                <div class="glass-effect rounded-xl p-4 action-card risk-medium">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-700 text-sm">Medium Risk</p>
+                            <p class="text-2xl font-bold">45</p>
+                        </div>
+                        <i class="fas fa-exclamation-circle text-3xl"></i>
+                    </div>
+                </div>
+                <div class="glass-effect rounded-xl p-4 action-card risk-low">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white/80 text-sm">Low Risk</p>
+                            <p class="text-2xl font-bold">209</p>
+                        </div>
+                        <i class="fas fa-check-circle text-3xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Main Map Section -->
+                <div class="lg:col-span-2">
+                    <div class="glass-effect rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-bold text-gray-800">Ward-Wise Risk Map</h2>
+                            <div class="flex space-x-2">
+                                <button onclick="refreshMap()" class="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition">
+                                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                                </button>
+                                <button class="px-3 py-1 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition">
+                                    <i class="fas fa-filter mr-1"></i>Filter
+                                </button>
+                            </div>
+                        </div>
+                        <div id="map"></div>
+                        <div class="mt-4 flex items-center justify-center space-x-6">
+                            <div class="flex items-center">
+                                <span class="status-indicator bg-red-500 mr-2"></span>
+                                <span class="text-sm text-gray-600">High Risk</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-indicator bg-yellow-500 mr-2"></span>
+                                <span class="text-sm text-gray-600">Medium Risk</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-indicator bg-green-500 mr-2"></span>
+                                <span class="text-sm text-gray-600">Low Risk</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Predictions Section -->
+                    <div class="glass-effect rounded-xl p-6 mt-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4">AI Risk Predictions</h2>
+                        <canvas id="predictionsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="space-y-6">
+                    <!-- Live Updates -->
+                    <div class="glass-effect rounded-xl p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-broadcast-tower text-red-500 mr-2"></i>
+                            Live Updates
+                        </h3>
+                        <div class="space-y-3 max-h-96 overflow-y-auto">
+                            <div class="sidebar-item bg-red-50 border-l-4 border-red-500 p-3 rounded cursor-pointer" onclick="showWardDetails('Karol Bagh')">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold text-red-800">Karol Bagh</p>
+                                        <p class="text-xs text-gray-600">Severe water-logging detected</p>
+                                    </div>
+                                    <span class="text-xs bg-red-500 text-white px-2 py-1 rounded">2m ago</span>
+                                </div>
+                            </div>
+                            <div class="sidebar-item bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded cursor-pointer" onclick="showWardDetails('Dwarka')">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold text-yellow-800">Dwarka Sector 21</p>
+                                        <p class="text-xs text-gray-600">Moderate risk - Drain blockage</p>
+                                    </div>
+                                    <span class="text-xs bg-yellow-500 text-white px-2 py-1 rounded">15m ago</span>
+                                </div>
+                            </div>
+                            <div class="sidebar-item bg-green-50 border-l-4 border-green-500 p-3 rounded cursor-pointer">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold text-green-800">Connaught Place</p>
+                                        <p class="text-xs text-gray-600">Issue resolved - Pumping complete</p>
+                                    </div>
+                                    <span class="text-xs bg-green-500 text-white px-2 py-1 rounded">30m ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Actions -->
+                    <div class="glass-effect rounded-xl p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-tasks text-purple-500 mr-2"></i>
+                            AI Recommended Actions
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border-l-4 border-purple-500">
+                                <p class="font-semibold text-purple-800">Immediate: Deploy pumps</p>
+                                <p class="text-sm text-gray-600">Karol Bagh, Paharganj - Critical water levels</p>
+                                <button class="mt-2 text-xs bg-purple-600 text-white px-3 py-1 rounded-full hover:bg-purple-700">
+                                    Take Action
+                                </button>
+                            </div>
+                            <div class="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border-l-4 border-blue-500">
+                                <p class="font-semibold text-blue-800">Preventive: Clean drains</p>
+                                <p class="text-sm text-gray-600">Dwarka, Rohini - Before monsoon</p>
+                                <button class="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700">
+                                    Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Citizen Reports -->
+                    <div class="glass-effect rounded-xl p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-users text-green-500 mr-2"></i>
+                            Recent Citizen Reports
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-start space-x-3">
+                                <img src="https://ui-avatars.com/api/?name=A&background=random" class="w-8 h-8 rounded-full">
+                                <div class="flex-1">
+                                    <p class="text-sm font-semibold">Anonymous</p>
+                                    <p class="text-xs text-gray-600">Heavy water-logging near Metro Station</p>
+                                    <p class="text-xs text-gray-400">Rajouri Garden • 5 min ago</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <img src="https://ui-avatars.com/api/?name=R&background=random" class="w-8 h-8 rounded-full">
+                                <div class="flex-1">
+                                    <p class="text-sm font-semibold">Resident</p>
+                                    <p class="text-xs text-gray-600">Drain overflow in main market</p>
+                                    <p class="text-xs text-gray-400">Lajpat Nagar • 12 min ago</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="openReportModal()" class="w-full mt-4 bg-gradient-to-r from-green-500 to-teal-500 text-white py-2 rounded-lg hover:shadow-lg transition">
+                            <i class="fas fa-plus-circle mr-2"></i>Submit Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content bg-white rounded-xl p-6 max-w-md mx-auto mt-20">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Report Water-Logging Issue</h3>
+                <button onclick="closeReportModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form onsubmit="submitReport(event)">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter ward or area name" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+                    <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        <option value="low">Low - Minor accumulation</option>
+                        <option value="medium">Medium - Traffic affected</option>
+                        <option value="high">High - Major flooding</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <textarea class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" rows="3" placeholder="Describe the issue..." required></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Image (Optional)</label>
+                    <input type="file" accept="image/*" class="w-full">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-2 rounded-lg hover:shadow-lg transition">
+                    Submit Report
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Map
+        let map;
+        let markers = [];
+
+        function initMap() {
+            map = L.map('map').setView([28.6139, 77.2090], 11);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add sample ward markers with risk levels
+            const wards = [
+                {name: "Karol Bagh", lat: 28.6514, lng: 77.1907, risk: "high", status: "Severe water-logging"},
+                {name: "Connaught Place", lat: 28.6315, lng: 77.2167, risk: "low", status: "Clear"},
+                {name: "Dwarka", lat: 28.5822, lng: 77.0500, risk: "medium", status: "Moderate risk"},
+                {name: "Rohini", lat: 28.7495, lng: 77.0565, risk: "low", status: "Clear"},
+                {name: "Lajpat Nagar", lat: 28.5677, lng: 77.2433, risk: "medium", status: "Drain blockage reported"},
+                {name: "Paharganj", lat: 28.6453, lng: 77.2128, risk: "high", status: "Critical - Immediate action needed"},
+                {name: "Vasant Kunj", lat: 28.5245, lng: 77.1492, risk: "low", status: "Monitoring"},
+                {name: "Mayur Vihar", lat: 28.6083, lng: 77.2908, risk: "medium", status: "Under observation"}
+            ];
+
+            wards.forEach(ward => {
+                let color = ward.risk === 'high' ? '#ef4444' : ward.risk === 'medium' ? '#f59e0b' : '#10b981';
+                let icon = L.divIcon({
+                    html: `<div style="background: ${color}; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+                    iconSize: [30, 30],
+                    className: 'custom-div-icon'
+                });
+                
+                let marker = L.marker([ward.lat, ward.lng], {icon: icon})
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="padding: 10px;">
+                            <h4 style="font-weight: bold; margin-bottom: 5px;">${ward.name}</h4>
+                            <p style="margin: 5px 0;">Risk Level: <span style="color: ${color}; font-weight: bold;">${ward.risk.toUpperCase()}</span></p>
+                            <p style="margin: 5px 0;">Status: ${ward.status}</p>
+                            <button onclick="showWardDetails('${ward.name}')" style="background: #6366f1; color: white; padding: 5px 10px; border-radius: 5px; border: none; cursor: pointer; margin-top: 5px;">View Details</button>
+                        </div>
+                    `);
+                markers.push(marker);
+            });
+        }
+
+        // Initialize Predictions Chart
+        function initPredictionsChart() {
+            const ctx = document.getElementById('predictionsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['June', 'July', 'August', 'September', 'October'],
+                    datasets: [{
+                        label: 'High Risk Wards',
+                        data: [12, 25, 45, 38, 15],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Medium Risk Wards',
+                        data: [30, 45, 60, 55, 35],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Low Risk Wards',
+                        data: [230, 202, 167, 179, 222],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        title: {
+                            display: true,
+                            text: 'AI Predicted Risk Levels (Monsoon 2024)'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Modal Functions
+        function openReportModal() {
+            document.getElementById('reportModal').style.display = 'block';
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').style.display = 'none';
+        }
+
+        function submitReport(event) {
+            event.preventDefault();
+            alert('Report submitted successfully! Our AI system will analyze and take appropriate action.');
+            closeReportModal();
+        }
+
+        function showWardDetails(wardName) {
+            alert(`Ward: ${wardName}\n\nAI Analysis:\n- Current Risk: High\n- Drainage Capacity: 60%\n- Predicted rainfall: 45mm\n- Recommended Action: Deploy emergency pumps\n- Historical incidents: 8 in last monsoon\n\nClick OK to view full report.`);
+        }
+
+        function refreshMap() {
+            // Simulate data refresh
+            alert('Map data refreshed! All ward statuses updated.');
+            // In real implementation, this would fetch new data from backend
+        }
+
+        // Initialize everything when page loads
+        window.onload = function() {
+            initMap();
+            initPredictionsChart();
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('reportModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Simulate real-time updates
+        setInterval(() => {
+            const updates = document.querySelector('.max-h-96');
+            const randomUpdate = Math.random();
+            
+            if (randomUpdate > 0.7) {
+                console.log('New update received from AI system');
+                // In real implementation, this would receive data from WebSocket/API
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
